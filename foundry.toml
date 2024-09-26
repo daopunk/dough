@@ -13,7 +13,7 @@ remappings = [
 cbor_metadata = true
 
 [rpc_endpoints]
-gnosis = "${GNOSIS_RPC_URL}"
+gnosis = "https://rpc.gnosis.gateway.fm"
 
 [etherscan]
 gnosis = { key = "${GNOSISSCAN_API_KEY}" }
