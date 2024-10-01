@@ -3,12 +3,14 @@ src = "src"
 out = "out"
 libs = ["lib"]
 solc = '0.8.25'
+evm_version = "cancun" # Compile Curve LP interface
 remappings = [
     '@delay-module=lib/delay-module/contracts/',
     '@roles-module=lib/roles-module/packages/evm/contracts/',
     '@gnosispay-kit=lib/account-kit/contracts/',
     '@balancer-v2=lib/balancer-v2-monorepo/pkg/',
     '@chainlink=lib/chainlink/contracts/src/v0.8/',
+    '@oz=lib/openzeppelin-contracts/contracts/',
 ]
 cbor_metadata = true
 
