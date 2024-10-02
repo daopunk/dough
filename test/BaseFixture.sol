@@ -13,11 +13,11 @@ import {ISafe} from "@gnosispay-kit/interfaces/ISafe.sol";
 
 import {IERC20} from "@oz/token/ERC20/IERC20.sol";
 
-import {ICurveStableSwap} from "src/interfaces/ICurveStableSwap.sol";
+import {ICurveStableSwap, ICurveStableSwapV2} from "src/interfaces/ICurveStableSwap.sol";
+
+uint256 constant INIT_BAL = 1000 ether;
 
 contract BaseFixture is Test {
-    uint256 initBal = 1000 ether;
-
     // gnosis pay modules
     Delay delayModule;
     Roles rolesModule;
@@ -27,18 +27,22 @@ contract BaseFixture is Test {
     ISafe safe;
 
     ICurveStableSwap curveBreadWxdai;
-    // ICurveStableSwap curveBreadWxdai;
+    ICurveStableSwap curve3Usd;
+    ICurveStableSwapV2 curveEureUsd;
 
     // Keeper address (forwarder): https://docs.chain.link/chainlink-automation/guides/forwarder#securing-your-upkeep
     address keeper;
+
+    uint256[3] public liquidity3Pool;
 
     function setUp() public virtual {
         vm.createSelectFork("gnosis");
 
         curveBreadWxdai = ICurveStableSwap(CURVE_LP_WXDAI_BREAD);
-        // CURVE_LP_EURE_USD
+        curve3Usd = ICurveStableSwap(CURVE_LP_WXDAI_USDC_USDT);
+        curveEureUsd = ICurveStableSwapV2(CURVE_LP_EURE_USD);
 
-        deal(GNOSIS_BREAD, GNOSIS_SAFE, initBal);
+        deal(GNOSIS_BREAD, GNOSIS_SAFE, INIT_BAL);
     }
 
     function testGetSafe() public {
@@ -77,19 +81,29 @@ contract BaseFixture is Test {
         assertGt(amountY, exchangeAmount - 1 ether);
     }
 
-    function testExchangeBreadForWxdai() public {
+    function testExchangeBreadForEure() public {
         uint256 exchangeAmount = 100 ether;
+        uint256 initWxdaiBal = IERC20(GNOSIS_WXDAI).balanceOf(GNOSIS_SAFE);
+        uint256 initEureBal = IERC20(GNOSIS_EURE).balanceOf(GNOSIS_SAFE);
         require(IERC20(GNOSIS_BREAD).balanceOf(GNOSIS_SAFE) >= exchangeAmount);
 
         vm.startPrank(GNOSIS_SAFE);
-        IERC20(GNOSIS_BREAD).approve(CURVE_LP_WXDAI_BREAD, exchangeAmount);
         // send 100 BREAD, recieve 99 WXDAI
-        uint256 amountWxdai = curveBreadWxdai.exchange(0, 1, exchangeAmount, exchangeAmount - 1 ether);
-        // send 99 WXDAI, recieve 89 EURE
-        // uint256 amountEure = curveBreadWxdai.exchange(0, 1, exchangeAmount, exchangeAmount - 1 ether);
+        IERC20(GNOSIS_BREAD).approve(CURVE_LP_WXDAI_BREAD, exchangeAmount);
+        uint256 amountWxdai = curveBreadWxdai.exchange(0, 1, exchangeAmount, exchangeAmount - 1 ether); // todo add proper exchange rate weighted limitations
+        assertEq(IERC20(GNOSIS_WXDAI).balanceOf(GNOSIS_SAFE), amountWxdai + initWxdaiBal);
 
+        // addLiquidity 99 WXDAI, recieve lpTokens
+        IERC20(GNOSIS_WXDAI).approve(CURVE_LP_WXDAI_USDC_USDT, exchangeAmount);
+        liquidity3Pool[0] = amountWxdai;
+        uint256 amount3Usd = curve3Usd.add_liquidity(liquidity3Pool, amountWxdai - 1 ether); // todo add proper exchange rate weighted limitations
+        assertEq(IERC20(GNOSIS_3CRV_WXDAI_USDC_USDT).balanceOf(GNOSIS_SAFE), amount3Usd);
+
+        IERC20(GNOSIS_3CRV_WXDAI_USDC_USDT).approve(CURVE_LP_EURE_USD, amount3Usd);
+        uint256 amountEure = curveEureUsd.exchange(1, 0, amount3Usd, 1 ether); // todo add proper exchange rate weighted limitations
+        assertEq(IERC20(GNOSIS_EURE).balanceOf(GNOSIS_SAFE), amountEure + initEureBal);
+
+        emit log_named_uint("wxDAI: 100 => EURe", amountEure);
         vm.stopPrank();
-
-        assertGt(amountY, exchangeAmount - 1 ether);
     }
 }
