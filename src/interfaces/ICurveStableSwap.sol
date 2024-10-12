@@ -49,7 +49,12 @@ interface ICurveStableSwapV2 is IERC20, IERC20Metadata {
     /**
      * @dev Get token address by index
      */
-    function coins(uint256 i) external returns (address);
+    function coins(uint256 i) external view returns (address);
+
+    /**
+     * @dev Get price of token to LP
+     */
+    function price_oracle() external view returns (uint256);
 
     /**
      * @dev Add liquidity to a Curve 2pool
@@ -64,12 +69,12 @@ interface ICurveStableSwapV2 is IERC20, IERC20Metadata {
     /**
      * @dev Get amount of received token X in swap for Y (send Y, receive X)
      */
-    function get_dx(int128 i, int128 j, uint256 exchangeAmount) external returns (uint256);
+    function get_dx(int128 i, int128 j, uint256 exchangeAmount) external view returns (uint256);
 
     /**
      * @dev Get amount of received token Y in swap for X (send X, receive Y)
      */
-    function get_dy(int128 i, int128 j, uint256 exchangeAmount) external returns (uint256);
+    function get_dy(int128 i, int128 j, uint256 exchangeAmount) external view returns (uint256);
 
     /**
      * @dev Exchange i for j

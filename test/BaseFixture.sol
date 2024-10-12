@@ -44,7 +44,9 @@ contract BaseFixture is Test {
 
         deal(GNOSIS_BREAD, GNOSIS_SAFE, INIT_BAL);
     }
+}
 
+contract Test_CurveFi is BaseFixture {
     function testGetSafe() public {
         uint256 initMoneriumBalance = IERC20(GNOSIS_EURE).balanceOf(GNOSIS_SAFE);
         uint256 txAmount = 10 ether;
@@ -73,8 +75,8 @@ contract BaseFixture is Test {
         require(IERC20(GNOSIS_BREAD).balanceOf(GNOSIS_SAFE) >= exchangeAmount);
 
         vm.startPrank(GNOSIS_SAFE);
-        IERC20(GNOSIS_BREAD).approve(CURVE_LP_WXDAI_BREAD, exchangeAmount);
         // send 100 BREAD, recieve 99 WXDAI
+        IERC20(GNOSIS_BREAD).approve(CURVE_LP_WXDAI_BREAD, exchangeAmount);
         uint256 amountY = curveBreadWxdai.exchange(0, 1, exchangeAmount, exchangeAmount - 1 ether);
         vm.stopPrank();
 
@@ -105,5 +107,11 @@ contract BaseFixture is Test {
 
         emit log_named_uint("wxDAI: 100 => EURe", amountEure);
         vm.stopPrank();
+    }
+}
+
+contract Test_PowerPool is BaseFixture {
+    function setUp() public override {
+        super.setUp();
     }
 }
