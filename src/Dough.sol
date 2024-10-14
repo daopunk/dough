@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.25;
 
-import "forge-std/Test.sol";
 import {IERC20} from "@oz/token/ERC20/IERC20.sol";
 import {ICurveStableSwap, ICurveStableSwapV2} from "src/interfaces/ICurveStableSwap.sol";
 
@@ -25,13 +24,12 @@ interface IDough {
 
     function register(uint256 _refillTrigger, uint256 _refillAmount) external;
 
-    // TODO: add view
-    function automatedPowerPoolCall() external returns (bool, bytes memory _payload);
+    function automatedPowerPoolCall() external view returns (bool, bytes memory _payload);
 
     function resolveRefillBalances(bytes calldata _payload) external;
 }
 
-contract Dough is IDough, Test {
+contract Dough is IDough {
     // TODO: check slippage math
     uint256 public constant SLIPPAGE = 0.99 ether; // 1% slippage
     uint256 constant WAD = 1 ether;
@@ -65,40 +63,39 @@ contract Dough is IDough, Test {
         // TODO: confirm Safe is associated with Gnosis Pay
 
         if (_refillTrigger >= _refillAmount) revert TriggerOverflow();
-        counter += 1;
-        if (counter > _maxRegistry) revert RegistryFull();
+        if (counter >= _maxRegistry) revert RegistryFull();
 
         _safeSettings[msg.sender] = SafeSettings(_refillTrigger, _refillAmount);
         _safeRegistry.push(msg.sender);
+        counter++;
 
         emit SafeRegistered(msg.sender, _refillTrigger, _refillAmount);
     }
 
-    function automatedPowerPoolCall() external returns (bool, bytes memory _payload) {
+    function automatedPowerPoolCall() external view returns (bool, bytes memory _payload) {
         uint256 _l = _getArrayLength();
-        address[] memory _safes = new address[](_l);
-        uint256[] memory _amounts = new uint256[](_l);
 
-        for (uint256 i; i < counter; i++) {
-            address _safe = _safeRegistry[i];
-            emit log_named_address("SAFE", _safe);
-            SafeSettings memory ss = _safeSettings[_safe];
+        if (_l > 0) {
+            address[] memory _safes = new address[](_l);
+            uint256[] memory _amounts = new uint256[](_l);
 
-            if (GNOSIS_EURE.balanceOf(_safe) < ss.refillTrigger) {
-                emit log_named_uint("EURE BAL", GNOSIS_EURE.balanceOf(_safe));
-                uint256 _amount =
-                    (ss.refillAmount - GNOSIS_EURE.balanceOf(_safe)) * WAD * 102 / CRV_EURE_USD.price_oracle() / 100;
+            uint256 _index;
+            for (uint256 i; i < counter; i++) {
+                address _safe = _safeRegistry[i];
+                SafeSettings memory ss = _safeSettings[_safe];
 
-                if (GNOSIS_BREAD.balanceOf(_safe) > _amount) {
-                    emit log_named_uint("BREAD BAL", GNOSIS_BREAD.balanceOf(_safe));
-                    _safes[i] = _safe;
-                    _amounts[i] = _amount;
+                uint256 _eureBal = GNOSIS_EURE.balanceOf(_safe);
+                if (_eureBal < ss.refillTrigger) {
+                    uint256 _amount = (ss.refillAmount - _eureBal) * WAD * 102 / 100 / CRV_EURE_USD.price_oracle();
+
+                    if (GNOSIS_BREAD.balanceOf(_safe) > _amount) {
+                        _safes[_index] = _safe;
+                        _amounts[_index] = _amount;
+                        _index++;
+                    }
                 }
             }
-        }
-        if (_safes.length > 0) {
             _payload = abi.encodeWithSelector(IDough.resolveRefillBalances.selector, abi.encode(_safes, _amounts));
-            // _payload = abi.encode(_safes, _amounts);
             return (true, _payload);
         } else {
             return (false, _payload);
@@ -107,14 +104,11 @@ contract Dough is IDough, Test {
 
     function resolveRefillBalances(bytes calldata _payload) external {
         (address[] memory _safes, uint256[] memory _amounts) = abi.decode(_payload, (address[], uint256[]));
-        // (bytes4 _s, bytes memory _params) = abi.decode(_payload, (bytes4, bytes));
-        // (address[] memory _safes, uint256[] memory _amounts) = abi.decode(_params, (address[], uint256[]));
+        uint256 _l = _safes.length;
 
-        uint256 l = _safes.length;
-
-        for (uint256 i = l; i > 0; i--) {
-            address _safe = _safes[i - 1];
-            uint256 _amount = _amounts[i - 1];
+        for (uint256 i; i < _l; i++) {
+            address _safe = _safes[i];
+            uint256 _amount = _amounts[i];
 
             GNOSIS_BREAD.transferFrom(_safe, address(this), _amount);
             uint256 _wxdai = CRV_WXDAI_BREAD.exchange(0, 1, _amount, _amount * SLIPPAGE / WAD);

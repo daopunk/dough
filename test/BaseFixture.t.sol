@@ -36,12 +36,12 @@ contract BaseFixture is Test {
         crv_3usd = IERC20(GNOSIS_3CRV_WXDAI_USDC_USDT);
     }
 
-    function testByteArray() public {
-        bytes memory byteArray1 = bytes("abcdefghijklmnpqrstuvwxyz");
-        bytes memory byteArray2 = bytes(byteArray1[4:8]);
-        emit log_bytes(byteArray1);
-        emit log_bytes(byteArray2);
-    }
+    // function testByteArray() public {
+    //     bytes memory byteArray1 = bytes("abcdefghijklmnpqrstuvwxyz");
+    //     bytes memory byteArray2 = bytes(byteArray1[4:8]);
+    //     emit log_bytes(byteArray1);
+    //     emit log_bytes(byteArray2);
+    // }
 }
 
 contract Test_Dough is BaseFixture {
@@ -70,17 +70,12 @@ contract Test_Dough is BaseFixture {
         (bool _proceed, bytes memory _payloadWithSelector) = dough.automatedPowerPoolCall();
 
         if (_proceed) {
-            emit log_string("PREPARE PAYLOAD");
+            emit log_string("EXECUTE RESOLVER");
 
-            emit log_named_bytes("PAYLOAD WITH SELECTOR", _payloadWithSelector);
-
-            // (, bytes memory _payload) = abi.decode(_payloadWithSelector, (bytes4, bytes));
             (bytes4 _selector, bytes memory _payload) = _decodeWithSelector(_payloadWithSelector);
             emit log_named_bytes32("SELECTOR", bytes32(_selector));
-            emit log_named_bytes("PAYLOAD", _payload);
-            emit log_string("EXECUTE RESOLVER");
+            emit log_named_bytes("FORMATTED DATA", _payload);
             dough.resolveRefillBalances(_payload);
-            // dough.resolveRefillBalances(_payloadWithSelector);
         } else {
             emit log_string("TERMINATE");
         }
@@ -91,17 +86,19 @@ contract Test_Dough is BaseFixture {
         eure.transfer(POS, _amount);
     }
 
-    function _decodeWithSelector(bytes memory _data) internal returns (bytes4, bytes memory) {
+    function _decodeWithSelector(bytes memory _data)
+        internal
+        returns (bytes4 _selector, bytes memory _dataWithoutSelector)
+    {
         uint256 BYTE_SHIFT = 0x44;
         uint256 _bytesSize = _data.length - BYTE_SHIFT;
-        bytes memory _dataWithoutSelector = new bytes(_bytesSize);
+        _dataWithoutSelector = new bytes(_bytesSize);
+        _selector = bytes4(_data);
 
-        for (uint8 i = 0; i < _bytesSize; i++) {
+        for (uint256 i = 0; i < _bytesSize; i++) {
             _dataWithoutSelector[i] = _data[i + BYTE_SHIFT];
         }
-        bytes4 _selector = bytes4(_data);
 
-        emit log_bytes(_dataWithoutSelector);
         return (_selector, _dataWithoutSelector);
     }
 
@@ -141,61 +138,38 @@ contract Test_Dough is BaseFixture {
         assertApproxEqRel(eure.balanceOf(GNOSIS_SAFE), UPPER, 0.999 ether); // 99.9 accuracy
     }
 
-    // function testAutomationMultiple() public {
-    //     vm.startPrank(GNOSIS_SAFE);
-    //     bread.approve(address(dough), type(uint256).max);
-    //     dough.register(LOWER, UPPER);
-    //     vm.stopPrank();
+    function testAutomationMultiple() public {
+        deal(GNOSIS_BREAD, address(0x421), INIT_BAL);
+        deal(GNOSIS_BREAD, address(0x422), INIT_BAL);
 
-    //     vm.prank(address(0x421));
-    //     dough.register(LOWER + 1, UPPER + 1);
+        vm.startPrank(GNOSIS_SAFE);
+        bread.approve(address(dough), type(uint256).max);
+        dough.register(LOWER, UPPER);
+        vm.stopPrank();
 
-    //     vm.prank(address(0x422));
-    //     dough.register(LOWER - 1, UPPER - 1);
+        vm.startPrank(address(0x421));
+        bread.approve(address(dough), type(uint256).max);
+        dough.register(LOWER + 1, UPPER + 1);
+        vm.stopPrank();
 
-    //     _mockGnosisPaySpend(SPEND_AMOUNT);
-    //     _mockAutomation();
-    //     assertEq(eure.balanceOf(GNOSIS_SAFE), INIT_EURE - SPEND_AMOUNT);
+        vm.startPrank(address(0x422));
+        bread.approve(address(dough), type(uint256).max);
+        dough.register(LOWER - 1, UPPER - 1);
+        vm.stopPrank();
 
-    //     _mockGnosisPaySpend(SPEND_AMOUNT);
-    //     _mockAutomation();
-    //     assertEq(eure.balanceOf(GNOSIS_SAFE), INIT_EURE - SPEND_AMOUNT * 2);
+        assertEq(dough.counter(), 3);
 
-    //     _mockGnosisPaySpend(1);
-    //     assertEq(eure.balanceOf(GNOSIS_SAFE), LOWER - 1);
-    //     _mockAutomation();
-    //     assertApproxEqRel(eure.balanceOf(GNOSIS_SAFE), UPPER, 0.999 ether); // 99.9 accuracy
-    // }
+        _mockGnosisPaySpend(SPEND_AMOUNT);
+        _mockAutomation();
+        assertEq(eure.balanceOf(GNOSIS_SAFE), INIT_EURE - SPEND_AMOUNT);
+
+        _mockGnosisPaySpend(SPEND_AMOUNT);
+        _mockAutomation();
+        assertEq(eure.balanceOf(GNOSIS_SAFE), INIT_EURE - SPEND_AMOUNT * 2);
+
+        _mockGnosisPaySpend(1);
+        assertEq(eure.balanceOf(GNOSIS_SAFE), LOWER - 1);
+        _mockAutomation();
+        assertApproxEqRel(eure.balanceOf(GNOSIS_SAFE), UPPER, 0.999 ether); // 99.9 accuracy
+    }
 }
-// 0xfcf2fcb6
-// 0000000000000000000000000000000000000000000000000000000000000020
-// 00000000000000000000000000000000000000000000000000000000000000c0
-// 0000000000000000000000000000000000000000000000000000000000000040
-// 0000000000000000000000000000000000000000000000000000000000000080
-// 0000000000000000000000000000000000000000000000000000000000000001
-// 000000000000000000000000447874194fe1110a4d14488995340f890c51a930
-// 0000000000000000000000000000000000000000000000000000000000000001
-// 000000000000000000000000000000000000000000000005ff28ca8409de9b6b
-
-// 0x
-// 0000000000000000000000000000000000000000000000000000000000000040
-// 0000000000000000000000000000000000000000000000000000000000000080
-// 0000000000000000000000000000000000000000000000000000000000000001
-// 000000000000000000000000447874194fe1110a4d14488995340f890c51a930
-// 0000000000000000000000000000000000000000000000000000000000000001
-// 000000000000000000000000000000000000000000000005fe5e94fcf29ea8f5
-
-// 0xfcf2fcb6
-// 0000000000000000000000000000000000000000000000000000000000000020
-// 00000000000000000000000000000000000000000000000000000000000000e0
-// 0000000000000000000000000000000000000000000000000000000000000001
-// 0000000000000000000000000000000000000000000000000000000000000060
-// 00000000000000000000000000000000000000000000000000000000000000a0
-// 0000000000000000000000000000000000000000000000000000000000000001
-// 000000000000000000000000447874194fe1110a4d14488995340f890c51a930
-// 0000000000000000000000000000000000000000000000000000000000000001
-// 000000000000000000000000000000000000000000000005ff23fbada69c4887
-
-// 0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000447874194fe1110a4d14488995340f890c51a9300000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000005fe781e23693e5b60
-// 0x000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000001000000000000000000000000447874194fe1110a4d14488995340f890c51a9300000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000005fe5868b7f3c98398
-// 0x00000000000000000000000000000000000000000000000000000001000000000000000000000000447874194fe1110a4d14488995340f890c51a9300000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000005fe5868b7f3c98398
