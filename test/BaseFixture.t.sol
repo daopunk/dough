@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.25;
 
-import "forge-std/Test.sol";
-import "script/Constants.sol";
-import {IERC20} from "@oz/token/ERC20/IERC20.sol";
-import {Dough, IDough} from "src/Dough.sol";
+import 'forge-std/Test.sol';
+import 'script/Constants.sol';
+import {IERC20} from '@oz/token/ERC20/IERC20.sol';
+import {Dough, IDough} from 'src/Dough.sol';
 
 // import {Delay} from "@delay-module/Delay.sol";
 // import {Roles} from "@roles-module/Roles.sol";
 // import {Bouncer} from "@gnosispay-kit/Bouncer.sol";
 // import {Enum} from "lib/delay-module/node_modules/@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import {ISafe} from "@gnosispay-kit/interfaces/ISafe.sol";
-import {ICurveStableSwap, ICurveStableSwapV2} from "src/interfaces/ICurveStableSwap.sol";
+import {ISafe} from '@gnosispay-kit/interfaces/ISafe.sol';
+import {ICurveStableSwap, ICurveStableSwapV2} from 'src/interfaces/ICurveStableSwap.sol';
 
 uint256 constant INIT_BAL = 1000 ether;
 uint256 constant INIT_EURE = 250 ether;
@@ -26,7 +26,7 @@ contract BaseFixture is Test {
     IERC20 public crv_3usd;
 
     function setUp() public virtual {
-        vm.createSelectFork("gnosis");
+        vm.createSelectFork('gnosis');
         deal(GNOSIS_BREAD, GNOSIS_SAFE, INIT_BAL);
         curveEureUsd = ICurveStableSwapV2(CURVE_LP_EURE_USD);
 
@@ -35,13 +35,6 @@ contract BaseFixture is Test {
         eure = IERC20(GNOSIS_EURE);
         crv_3usd = IERC20(GNOSIS_3CRV_WXDAI_USDC_USDT);
     }
-
-    // function testByteArray() public {
-    //     bytes memory byteArray1 = bytes("abcdefghijklmnpqrstuvwxyz");
-    //     bytes memory byteArray2 = bytes(byteArray1[4:8]);
-    //     emit log_bytes(byteArray1);
-    //     emit log_bytes(byteArray2);
-    // }
 }
 
 contract Test_Dough is BaseFixture {
@@ -67,17 +60,17 @@ contract Test_Dough is BaseFixture {
     }
 
     function _mockAutomation() internal {
-        (bool _proceed, bytes memory _payloadWithSelector) = dough.automatedPowerPoolCall();
+        (bool _proceed, bytes memory _payloadWithSelector) = dough.resolveBalances();
 
         if (_proceed) {
-            emit log_string("EXECUTE RESOLVER");
+            emit log_string('EXECUTE swapBreadToEure');
 
             (bytes4 _selector, bytes memory _payload) = _decodeWithSelector(_payloadWithSelector);
-            emit log_named_bytes32("SELECTOR", bytes32(_selector));
-            emit log_named_bytes("FORMATTED DATA", _payload);
-            dough.resolveRefillBalances(_payload);
+            emit log_named_bytes32('SELECTOR', bytes32(_selector));
+            emit log_named_bytes('FORMATTED DATA', _payload);
+            dough.swapBreadToEure(_payload);
         } else {
-            emit log_string("TERMINATE");
+            emit log_string('TERMINATE');
         }
     }
 
@@ -88,6 +81,7 @@ contract Test_Dough is BaseFixture {
 
     function _decodeWithSelector(bytes memory _data)
         internal
+        pure
         returns (bytes4 _selector, bytes memory _dataWithoutSelector)
     {
         uint256 BYTE_SHIFT = 0x44;

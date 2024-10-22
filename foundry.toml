@@ -1,3 +1,9 @@
+[fmt]
+line_length = 120
+number_underscore = 'thousands'
+wrap_comments = false
+quote_style = 'single'
+
 [profile.default]
 src = "src"
 out = "out"
@@ -16,6 +22,7 @@ cbor_metadata = true
 
 [rpc_endpoints]
 gnosis = "https://rpc.gnosis.gateway.fm"
+sepolia = "https://eth-sepolia.g.alchemy.com/v2/demo"
 
 [etherscan]
 gnosis = { key = "${GNOSISSCAN_API_KEY}" }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.25;
 
-import {IERC20} from "@oz/token/ERC20/IERC20.sol";
-import {ICurveStableSwap, ICurveStableSwapV2} from "src/interfaces/ICurveStableSwap.sol";
+import {IERC20} from '@oz/token/ERC20/IERC20.sol';
+import {ICurveStableSwap, ICurveStableSwapV2} from 'src/interfaces/ICurveStableSwap.sol';
 
 interface IDough {
     error TriggerOverflow();
@@ -24,9 +24,9 @@ interface IDough {
 
     function register(uint256 _refillTrigger, uint256 _refillAmount) external;
 
-    function automatedPowerPoolCall() external view returns (bool, bytes memory _payload);
+    function resolveBalances() external view returns (bool, bytes memory _payload);
 
-    function resolveRefillBalances(bytes calldata _payload) external;
+    function swapBreadToEure(bytes calldata _payload) external;
 }
 
 contract Dough is IDough {
@@ -72,10 +72,13 @@ contract Dough is IDough {
         emit SafeRegistered(msg.sender, _refillTrigger, _refillAmount);
     }
 
-    function automatedPowerPoolCall() external view returns (bool, bytes memory _payload) {
+    function resolveBalances() external view returns (bool, bytes memory _payload) {
+        // enforce caller is from PowerPool
+
         uint256 _l = _getArrayLength();
 
         if (_l > 0) {
+            uint256 _price = CRV_EURE_USD.price_oracle();
             address[] memory _safes = new address[](_l);
             uint256[] memory _amounts = new uint256[](_l);
 
@@ -86,7 +89,7 @@ contract Dough is IDough {
 
                 uint256 _eureBal = GNOSIS_EURE.balanceOf(_safe);
                 if (_eureBal < ss.refillTrigger) {
-                    uint256 _amount = (ss.refillAmount - _eureBal) * WAD * 102 / 100 / CRV_EURE_USD.price_oracle();
+                    uint256 _amount = (ss.refillAmount - _eureBal) * WAD * 102 / 100 / _price;
 
                     if (GNOSIS_BREAD.balanceOf(_safe) > _amount) {
                         _safes[_index] = _safe;
@@ -95,17 +98,22 @@ contract Dough is IDough {
                     }
                 }
             }
-            _payload = abi.encodeWithSelector(IDough.resolveRefillBalances.selector, abi.encode(_safes, _amounts));
+            _payload = abi.encodeWithSelector(IDough.swapBreadToEure.selector, abi.encode(_safes, _amounts));
             return (true, _payload);
         } else {
             return (false, _payload);
         }
     }
 
-    function resolveRefillBalances(bytes calldata _payload) external {
+    function swapBreadToEure(bytes calldata _payload) external {
+        /**
+         * TODO: enforce caller is from PowerPool (for security)
+         *      - call agent contract
+         *      - compare msg.sender to the list of keepers in the agent contract
+         */
         (address[] memory _safes, uint256[] memory _amounts) = abi.decode(_payload, (address[], uint256[]));
-        uint256 _l = _safes.length;
 
+        uint256 _l = _safes.length;
         for (uint256 i; i < _l; i++) {
             address _safe = _safes[i];
             uint256 _amount = _amounts[i];
